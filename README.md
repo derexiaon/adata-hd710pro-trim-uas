@@ -38,6 +38,13 @@ This repo contains:
 Stock `sg_vpd -p bl` showed *Maximum unmap LBA count: not implemented*, and
 `lsblk -D` showed `DISC-MAX 0B`.
 
+> **Your unit may differ.** Everything here was tested on **one** enclosure.
+> Other batches, capacities (1–4 TB) or regions may ship with a different disk
+> (CMR or SMR, different model), a different ADATA firmware version, or even a
+> different bridge chip. **Check your unit first** (step 0 below) and stop if it
+> doesn't match. If you try this on another revision, please open an issue with
+> your `lsusb`, `JMS578FwUpdate -v`, disk model and results, so the list grows.
+
 ## Results
 
 20 GB file, `dd ... oflag=direct conv=fsync`, same USB port:
@@ -132,6 +139,14 @@ On x86 use the Windows tool or qemu-user. All files are on the
 [ODROID wiki](https://wiki.odroid.com/odroid-xu4/software/jms578_fw_update).
 A mirror is in [hferreira23/JMS578](https://github.com/hferreira23/JMS578).
 
+0. **Check your unit:**
+   ```bash
+   lsusb                          # stock: 125f:a75a A-DATA ... HD710 PRO
+   ./JMS578FwUpdate -d /dev/sdX -v  # must print "Bridge Firmware Version: ..."; if it fails, it is not a JMS578 — stop
+   sudo smartctl -i -d sat /dev/sdX # disk model; is it SMR? does it support TRIM ("TRIM Command: Available")?
+   ```
+   If your disk is CMR, TRIM gives little benefit: UAS alone may be all you want,
+   and you can keep the shock sensor (see [Rollback](#rollback), `--uas on`).
 1. **Download the official firmware** `JMS578-Hardkenel-Release-v173.01.00.02-20190306.bin`
    and check it: sha256 must be
    `e815f7176807add17ae0b6b04fd44f9a1de5fc93e956ac61a74ab6a71d71e4b8`

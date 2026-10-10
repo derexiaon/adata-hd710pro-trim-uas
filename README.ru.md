@@ -37,6 +37,13 @@ NVRAM возвращены на ADATA, включает и то, и другое
 На штатной прошивке `sg_vpd -p bl` показывал *Maximum unmap LBA count: not
 implemented*, а `lsblk -D` — `DISC-MAX 0B`.
 
+> **Ваш экземпляр может отличаться.** Всё здесь проверено на **одной** коробке.
+> В других партиях, объёмах (1–4 ТБ) или регионах может стоять другой диск (CMR
+> или SMR, другая модель), другая версия прошивки ADATA или даже другой мост.
+> **Сначала проверьте свой экземпляр** (шаг 0 ниже) и остановитесь, если он не
+> совпадает. Если попробуете на другой ревизии, откройте issue с выводом `lsusb`,
+> `JMS578FwUpdate -v`, моделью диска и результатами, чтобы список рос.
+
 ## Результат
 
 Файл 20 ГБ, `dd ... oflag=direct conv=fsync`, один и тот же USB-порт:
@@ -131,6 +138,14 @@ implemented*, а `lsblk -D` — `DISC-MAX 0B`.
 [вики ODROID](https://wiki.odroid.com/odroid-xu4/software/jms578_fw_update).
 Зеркало — в [hferreira23/JMS578](https://github.com/hferreira23/JMS578).
 
+0. **Проверьте свой экземпляр:**
+   ```bash
+   lsusb                          # штатно: 125f:a75a A-DATA ... HD710 PRO
+   ./JMS578FwUpdate -d /dev/sdX -v  # должна вывести "Bridge Firmware Version: ..."; если ошибка — это не JMS578, остановитесь
+   sudo smartctl -i -d sat /dev/sdX # модель диска; SMR ли он; есть ли TRIM ("TRIM Command: Available")
+   ```
+   Если диск CMR, от TRIM мало пользы: возможно, вам хватит одного UAS, и тогда
+   можно сохранить датчик удара (см. [Откат](#откат), `--uas on`).
 1. **Скачайте официальную прошивку** `JMS578-Hardkenel-Release-v173.01.00.02-20190306.bin`
    и проверьте её: sha256 должен быть
    `e815f7176807add17ae0b6b04fd44f9a1de5fc93e956ac61a74ab6a71d71e4b8`
