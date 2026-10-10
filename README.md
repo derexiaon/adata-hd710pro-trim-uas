@@ -133,11 +133,27 @@ Conclusions:
 
 ## How to
 
-You need: Linux, `python3`, `sg3-utils`, a USB 3.0 port, and Hardkernel's
-**`JMS578FwUpdate`** tool. It is a static ARM binary, so it runs on ARM boards.
-On x86 use the Windows tool or qemu-user. All files are on the
-[ODROID wiki](https://wiki.odroid.com/odroid-xu4/software/jms578_fw_update).
-A mirror is in [hferreira23/JMS578](https://github.com/hferreira23/JMS578).
+### What runs where
+
+| Part | Platforms | Status |
+|---|---|---|
+| `jms578_nvram.py` (build / inspect / diff images) | **any OS**: pure Python 3, no dependencies | ✅ tested |
+| Flashing: Hardkernel `JMS578FwUpdate` (v2.00 / v1.00) | **Linux on ARM**: 32-bit ARM static binary. Runs on Raspberry Pi, ODROID, other ARM SBCs, and on arm64 with 32-bit support | ✅ tested (arm64 SBC) |
+| Flashing: JMicron `FwUpdateTool` (`FwUpdateTool_v1_19_16_24.exe`) | **Windows**: the chip vendor's own GUI tool, same functions (backup, flash `.bin`) | ⚠️ not tested by us |
+| Flashing: `JMS578FwUpdate` via `qemu-user-static` (`qemu-arm`) | **Linux on x86-64** | ⚠️ not tested. The binary is static, so it should start; whether SG_IO passthrough works under emulation is unknown |
+| TRIM afterwards (`fstrim`, udev rule) | Linux | ✅ tested |
+| TRIM afterwards | Windows / macOS | ⚠️ not tested. Windows 10/11 should issue TRIM to UAS devices that report UNMAP; check with `fsutil behavior query DisableDeleteNotify` and the drive optimizer |
+
+All tools are on the
+[ODROID wiki](https://wiki.odroid.com/odroid-xu4/software/jms578_fw_update);
+a mirror is in [hferreira23/JMS578](https://github.com/hferreira23/JMS578).
+**Always make a backup (`-b`, or "Backup" in the Windows tool) before
+flashing.** If you succeed with the Windows tool or qemu, please report it in an
+issue.
+
+The steps below use the Linux/ARM tool. You also need `python3`, `sg3-utils`
+(and `smartmontools` for step 0) and a USB 3.0 port. With the Windows tool, do
+steps 2–6 in its GUI: back up, then flash the image built in step 4.
 
 0. **Check your unit:**
    ```bash

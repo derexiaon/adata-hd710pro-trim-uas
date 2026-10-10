@@ -132,11 +132,27 @@ implemented*, а `lsblk -D` — `DISC-MAX 0B`.
 
 ## Как прошить
 
-Понадобятся: Linux, `python3`, `sg3-utils`, порт USB 3.0 и утилита Hardkernel
-**`JMS578FwUpdate`**. Это статический ARM-бинарник, он запускается на ARM-платах.
-На x86 используйте утилиту для Windows или qemu-user. Всё лежит на
-[вики ODROID](https://wiki.odroid.com/odroid-xu4/software/jms578_fw_update).
-Зеркало — в [hferreira23/JMS578](https://github.com/hferreira23/JMS578).
+### Что где работает
+
+| Часть | Платформы | Статус |
+|---|---|---|
+| `jms578_nvram.py` (сборка, просмотр, сравнение образов) | **любая ОС**: чистый Python 3, без зависимостей | ✅ проверено |
+| Прошивка: `JMS578FwUpdate` от Hardkernel (v2.00 / v1.00) | **Linux на ARM**: статический 32-битный ARM-бинарник. Работает на Raspberry Pi, ODROID, других ARM-платах и на arm64 с поддержкой 32-битных программ | ✅ проверено (одноплатник arm64) |
+| Прошивка: `FwUpdateTool` от JMicron (`FwUpdateTool_v1_19_16_24.exe`) | **Windows**: графическая утилита производителя чипа, те же функции (копия, прошивка `.bin`) | ⚠️ нами не проверено |
+| Прошивка: `JMS578FwUpdate` через `qemu-user-static` (`qemu-arm`) | **Linux на x86-64** | ⚠️ не проверено. Бинарник статический, поэтому должен запуститься; пройдут ли команды SG_IO через эмуляцию, неизвестно |
+| TRIM после прошивки (`fstrim`, правило udev) | Linux | ✅ проверено |
+| TRIM после прошивки | Windows / macOS | ⚠️ не проверено. Windows 10/11 должна отправлять TRIM на UAS-устройства, которые сообщают о UNMAP; проверить можно командой `fsutil behavior query DisableDeleteNotify` и через «Оптимизацию дисков» |
+
+Все утилиты лежат на
+[вики ODROID](https://wiki.odroid.com/odroid-xu4/software/jms578_fw_update),
+зеркало — в [hferreira23/JMS578](https://github.com/hferreira23/JMS578).
+**Перед прошивкой всегда сохраняйте копию (`-b` или «Backup» в утилите для
+Windows).** Если получится прошить через утилиту для Windows или qemu, напишите,
+пожалуйста, в issue.
+
+Шаги ниже — для утилиты Linux/ARM. Также понадобятся `python3`, `sg3-utils`
+(и `smartmontools` для шага 0) и порт USB 3.0. С утилитой для Windows шаги 2–6
+выполняются в её окне: сохранить копию, затем прошить образ, собранный на шаге 4.
 
 0. **Проверьте свой экземпляр:**
    ```bash
