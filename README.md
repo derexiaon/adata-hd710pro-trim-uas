@@ -137,6 +137,7 @@ All were flashed on the unit described above and verified with `sg_vpd -p lbpv`
 | 4 | Hardkernel v173.01.00.02 | `C41C=00`, `C4F3=05` (ADATA values) | ✅ | ❌ 0 | blue + red |
 | 5 | Hardkernel v173.01.00.02 | `C41C=00`, `C4F2=18` | ✅ | ✅ 1 | **blue off**, red on |
 | 6 | Hardkernel v173.01.00.02 | `C4F2=28`, `C4F3=81` | ✅ | ❌ 0 | blue blinks, red on |
+| 7 | JMS578_PPE v124.01.00.02 (a third code base, from ralimtek's article) | HK config | ✅ | ⚠️ 1, but every `fstrim` DISCARD fails with *critical target error* | blue + red on |
 
 Conclusions:
 - **UAS on ADATA's code works**: just set bit 6 of `0xC4E7`.
@@ -149,6 +150,9 @@ Conclusions:
 - **The red LED comes from Hardkernel's code.** None of the NVRAM bits tried
   (`C4F2` bits 4–5, `C4F3`, `C41C`) turns it off. `C4F2` bit 5 only inverts the
   blue activity LED.
+- **PPE v124.01.00.02 is not an alternative**: it advertises UNMAP, but the
+  actual TRIM commands fail (likely the bug Hardkernel fixed in v173.01.00.02,
+  "Fix TRIM command"), and it lights the red LED too.
 
 ## How to
 
@@ -173,7 +177,15 @@ issue.
 
 The steps below use the Linux/ARM tool. You also need `python3`, `sg3-utils`
 (and `smartmontools` for step 0) and a USB 3.0 port. With the Windows tool, do
-steps 2–6 in its GUI: back up, then flash the image built in step 4.
+steps 2–6 in its GUI (procedure from [ralimtek](https://ralimtek.com/posts/2021/jms578/)
+and tomman's thread):
+- the drive must be in the enclosure, otherwise the bridge does not enumerate;
+- tick **"RD Version"** to show the extra options;
+- backup: tick **"Backup Old Firmware Only"**, choose a file, *Run*; make a second
+  backup and compare the two;
+- flash: untick the backup option, *Load File* = the image from step 4, and
+  **keep "Include JMS577 NVRAM" ticked**. Our image needs its NVRAM: the ADATA
+  names and the TRIM bit live there. Then *Run* and power-cycle.
 
 0. **Check your unit:**
    ```bash
@@ -252,6 +264,19 @@ python3 jms578_nvram.py patch adata-original.bin --uas on -o adata-uas.bin
 For an SMR disk this is pointless, because the write collapse is caused by the
 missing TRIM, not by the USB protocol.
 
+### Alternative: no NVRAM at all
+
+[ralimtek](https://ralimtek.com/posts/2021/jms578/) erases the whole flash and
+writes only the code (Windows tool: *Erase All Flash Only*, then flash with
+*Include JMS577 NVRAM* unticked). The bridge then runs on built-in defaults: it
+reports the drive's real model and serial and does not spin it down. We have not
+tried this on the HD710 Pro. You lose the ADATA names, and it is unknown whether
+TRIM is on by default in the HK code.
+
+The same article describes the recovery from a bad flash: short the SPI flash
+**MISO pin to ground for ~1 s at power-up**. The bridge then boots from its
+internal ROM, and you can erase and reflash.
+
 ### If UAS misbehaves
 
 On some JMS578 boards UAS is unstable in hardware (stalls, data corruption,
@@ -294,6 +319,7 @@ the NVRAM diff, and `LBPU`/`lsusb -t`/LED results) are welcome.
   [bboard thread](https://helmet.kafuka.org/bboard/thread.php?id=259),
   [Zibri/JMS579#3](https://github.com/Zibri/JMS579/issues/3)
 - Zibri, for the [JMS577/578/579 customizer](https://zibri.github.io/JMS579/index2.html)
+- Ralim, for the [JMS578 article](https://ralimtek.com/posts/2021/jms578/) (Windows procedure, blank NVRAM, recovery)
 - BertoldVdb, for the open-source [jms578flash](https://github.com/BertoldVdb/jms578flash)
 - BetterFirmware and others, [forum t=41926](https://forum.odroid.com/viewtopic.php?t=41926)
 - Firmware collections: [usbdev.ru](https://www.usbdev.ru/files/jmicron/jms578firmware/),
