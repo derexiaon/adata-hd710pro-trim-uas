@@ -33,10 +33,10 @@ USB_SER = 0xC454
 USB_SER_MAX = 16         # up to 0xC465
 INQ_VENDOR = 0xC4C8      # SCSI INQUIRY vendor, 8 bytes, space padded
 INQ_PRODUCT = 0xC4D0     # SCSI INQUIRY product, 16 bytes, space padded
-FLAGS_E7 = 0xC4E7        # bit7 = !4K block, bit6 = UAS, bit5 = MultiSec (per Zibri's customizer)
-FLAGS_F2 = 0xC4F2        # bit3 = energy saving, bit5 = !LED invert (per Zibri)
-BYTE_1C = 0xC41C         # unknown; with Hardkernel code TRIM needs 0xC41C/0xC4F3 = 03/c1
-BYTE_F3 = 0xC4F3         # unknown; low bits differ per vendor (ADATA = 5)
+FLAGS_E7 = 0xC4E7        # bit7 = BOT (USB Mass Storage), bit6 = UAS, bit5 = 4K sector emulation (tomman/nkma)
+FLAGS_F2 = 0xC4F2        # bit3 = power save, bit5 = activity LED polarity (clear = blue LED off on HD710 Pro)
+BYTE_1C = 0xC41C         # type byte of an empty 'bogus' string descriptor at 0xC41B; not a setting
+BYTE_F3 = 0xC4F3         # bit6 = TRIM (UNMAP) in Hardkernel code, bit7 always set, low bits vendor-specific
 SPINDOWN = 0xC4F6        # big endian, seconds, 0 = never
 
 
@@ -85,10 +85,12 @@ def info(b):
     print(f"USB serial        {get_desc(b, USB_SER, USB_SER_MAX)!r}  (0xC454 = {b[USB_SER]:#04x}; 0 = pass through HDD serial)")
     print(f"INQUIRY           {bytes(b[INQ_VENDOR:INQ_VENDOR+8]).decode('ascii','replace')!r} "
           f"{bytes(b[INQ_PRODUCT:INQ_PRODUCT+16]).decode('ascii','replace')!r}")
-    print(f"0xC4E7 = {e7:#04x}     UAS={'on' if e7 & 0x40 else 'off'}  MultiSec={'on' if e7 & 0x20 else 'off'}  "
-          f"4K={'on' if not e7 & 0x80 else 'off'}")
-    print(f"0xC4F2 = {f2:#04x}     energy saving={'on' if f2 & 0x08 else 'off'}  LED invert={'no' if f2 & 0x20 else 'yes'}")
-    print(f"0xC41C = {b[BYTE_1C]:#04x}     0xC4F3 = {b[BYTE_F3]:#04x}")
+    print(f"0xC4E7 = {e7:#04x}     BOT={'on' if e7 & 0x80 else 'off'}  UAS={'on' if e7 & 0x40 else 'off'}  "
+          f"4K emulation={'on' if e7 & 0x20 else 'off'}")
+    print(f"0xC4F2 = {f2:#04x}     power save={'on' if f2 & 0x08 else 'off'}  activity LED polarity bit5={'1' if f2 & 0x20 else '0'}")
+    f3 = b[BYTE_F3]
+    print(f"0xC4F3 = {f3:#04x}     TRIM bit6={'1' if f3 & 0x40 else '0'} (effective with Hardkernel code only)")
+    print(f"0xC40A = {b[0xC40A]:#04x}     ({'SCSI strings from NVRAM' if b[0xC40A] == 0x0A else 'ATA ID of the drive (per tomman)'})")
     print(f"spin-down         {sd} s" + (" (never)" if sd == 0 else f" ({sd/60:g} min)"))
 
 

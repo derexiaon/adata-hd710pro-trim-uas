@@ -73,11 +73,15 @@ a drive you carry around, think twice.
 ## Firmware structure (JMS578)
 
 An SPI image is **50688 bytes = 50176 bytes of 8051 code + 512 bytes of NVRAM at
-`0xC400`**.
+`0xC400`**. The firmware headers say *JMicron JMS579* even on JMS578 chips; the
+same family is used in JMS576/577/578/579 bridges.
 
 - The **NVRAM has no checksum**. Checked on 34 different JMS578 images: two
   images from the same vendor differ in a single serial-number character and
   both work.
+- The second half of the NVRAM (`0xC500–C5FF`) is identical in every dump known
+  (md5 `34a237c125b376b075debfaa6fbff386`, also on our ADATA and Hardkernel
+  images). It is a handy check that you located the block correctly.
 - The **code area has a checksum at `0x3FC–0x3FF`**. The bridge also sets a flag
   at **`0x207` (00→01)** after its first boot and rewrites that checksum. So a
   dump read back from a used bridge differs from the release file in exactly
@@ -89,37 +93,50 @@ An SPI image is **50688 bytes = 50176 bytes of 8051 code + 512 bytes of NVRAM at
 
 ### NVRAM map
 
-The `Source` column shows where each meaning comes from: **Zibri** = Zibri's
-JMS577/578/579 customizer (`script2.js`), **obs** = our own observations.
+Offsets are absolute (relative offset + `0xC400`). Sources: **tomman** =
+[tomman's notes](https://helmet.kafuka.org/bboard/thread.php?id=259) (post
+"JMS576/7/8/9 EEPROM offsets", plus nkma's corrections in the same thread);
+**Zibri** = [Zibri's customizer](https://zibri.github.io/JMS579/index2.html);
+**obs** = flashed and checked on our unit.
 
 | Offset | Meaning | Source |
 |---|---|---|
-| `0xC400–C403` | VID, PID (little endian). HK `152d:0578`, ADATA `125f:a75a` | obs |
-| `0xC40C` | USB manufacturer string descriptor: `[len=2+2n][0x03][ASCII…]`, up to 14 chars (`0xC40E–C41B`) | obs |
-| `0xC41C` | **unknown**. HK `03`, ADATA `00`. Together with `0xC4F3` it gates TRIM in the HK code | obs |
-| `0xC430` | USB product string descriptor, same format, up to 34 chars | obs |
-| `0xC454` | USB serial descriptor, same format, up to 16 chars at `0xC456`. `0x00` = report the HDD's own serial | Zibri + obs |
-| `0xC4C8` | SCSI INQUIRY vendor (8 bytes, space-padded) | obs |
-| `0xC4D0` | SCSI INQUIRY product (16 bytes, space-padded) | obs |
-| `0xC4E7` | bit7 = 4K sectors (inverted), **bit6 = UAS**, bit5 = MultiSec. HK `c3`, ADATA `83` | Zibri, confirmed |
-| `0xC4F2` | bit3 = energy saving, bit5 = LED **not** inverted. Both HK and ADATA use `38` | Zibri |
-| `0xC4F3` | **unknown**. HK `c1`, ADATA `05`. The low bits differ between vendors (0/1/5/7/8/9). Gates TRIM together with `0xC41C` | obs |
-| `0xC4F6–C4F7` | spin-down timeout, seconds, big endian. `0` = never. HK 600, ADATA 180 | Zibri, obs |
+| `0xC400–C403` | VID, PID (little endian). HK `152d:0578`, ADATA `125f:a75a` | tomman, obs |
+| `0xC408–C409` | USB bcdDevice? | tomman |
+| `0xC40A` | SCSI identity byte. tomman's table: `0x0A` = use the SCSI strings at `0xC4C8`, anything else (usually `01`) = use the drive's ATA ID; a later post says the opposite. **Our unit: `0x0A`, and the enclosure reports the NVRAM strings**, which matches the table | tomman, obs |
+| `0xC40C` | USB manufacturer string descriptor: `[len=2+2n][0x03][ASCII…]`, up to 14 chars (`0xC40E–C41B`). The length counts UTF-16 bytes, but the string is stored as ASCII | tomman, obs |
+| `0xC41B–C41C` | `00 03` on HK: an empty "bogus" string descriptor that some dumps have (ADATA: `00 00`). **Not a setting**: changing `0xC41C` has no effect on TRIM (exp. #5) | tomman, obs |
+| `0xC430` | USB product string descriptor, same format, up to 34 chars | tomman, obs |
+| `0xC454` | USB serial descriptor, same format, up to 16 chars at `0xC456`. `0x00` = report the drive's own serial (sometimes a made-up one) | tomman, Zibri |
+| `0xC4C8` | SCSI INQUIRY vendor (8 bytes, space-padded) | tomman, obs |
+| `0xC4D0` | SCSI INQUIRY product (16 bytes, space-padded) | tomman, obs |
+| `0xC4E0–C4E1` | `"HD"` | tomman |
+| `0xC4E7` | features 1: **bit7 = USB Mass Storage (BOT)**, **bit6 = UAS**, **bit5 = 4K sector emulation** (keep off), bit1 usually set. HK `c3`, ADATA `83` (BOT only). Zibri's page has the labels of bits 7 and 5 swapped | tomman/nkma; bit6 obs |
+| `0xC4F0–C4F1` | `"BC"` | tomman |
+| `0xC4F2` | features 2: bit3 = power save (spin-down), **bit5 = activity-LED polarity**. HK and ADATA `38`. On the HD710 Pro, clearing bit5 (`18`) turns the **blue** LED off; the red LED is unaffected. Clearing bit4 (`28`) changed nothing visible | tomman/nkma, obs |
+| `0xC4F3` | features 3: **bit6 = TRIM (UNMAP) in the HK code**. Bit7 is set in every known dump; bit3 is set in an ODD-enabled firmware. HK `c1`, ADATA `05` (bits 7–6 clear, ADATA-only bit2 set) | tomman, **obs (exp. #4, #6)** |
+| `0xC4F6–C4F7` | spin-down timeout, seconds, big endian. `0` = never. HK 600, ADATA 180 | tomman, Zibri, obs |
+| `0xC4F8–C4FD` | `40 0F 32 05 00 00` | tomman |
+| `0xC4FE–C4FF` | `"JM"`, NVRAM identifier | tomman |
+| `0xC500–C5FF` | constant block, same in all dumps | tomman, obs |
 
 `python3 jms578_nvram.py info image.bin` decodes all of these.
 
 ## Experiments
 
 All were flashed on the unit described above and verified with `sg_vpd -p lbpv`
-(`LBPU`) and `lsusb -t`.
+(`LBPU`) and `lsusb -t`. All rows use the ADATA strings and VID:PID
+`152d:0578` unless stated otherwise.
 
-| # | Code | NVRAM changes | UAS | TRIM (LBPU) | LEDs |
+| # | Code | NVRAM changes (vs. HK config) | UAS | TRIM (LBPU) | LEDs |
 |---|---|---|---|---|---|
-| 0 | ADATA v119.2.0.3 | stock | ❌ | ❌ | blue only |
-| 1 | ADATA v119.2.0.3 | VID:PID `152d:0578`, `C41C=03`, **`C4E7=c3` (UAS)**, `C4F3=c5` | ✅ | ❌ 0 | not recorded |
+| 0 | ADATA v119.2.0.3 | stock ADATA (`125f:a75a`) | ❌ | ❌ | blue only |
+| 1 | ADATA v119.2.0.3 | ADATA config + **`C4E7=c3` (UAS)**, `C41C=03`, `C4F3=c5` | ✅ | ❌ 0 | not recorded |
 | 2 | ADATA v119.2.0.3 | as #1 but `C4F3=c1` (= full HK config) | ✅ | ❌ 0 | **blue only** |
-| 3 | Hardkernel v173.01.00.02 | HK config + ADATA strings (**the result**) | ✅ | ✅ 1 | blue + **red always on** |
-| 4 | Hardkernel v173.01.00.02 | as #3 but `C41C=00`, `C4F3=05` (ADATA values) | ✅ | ❌ 0 | blue + red |
+| 3 | Hardkernel v173.01.00.02 | none (**the result**) | ✅ | ✅ 1 | blue + **red always on** |
+| 4 | Hardkernel v173.01.00.02 | `C41C=00`, `C4F3=05` (ADATA values) | ✅ | ❌ 0 | blue + red |
+| 5 | Hardkernel v173.01.00.02 | `C41C=00`, `C4F2=18` | ✅ | ✅ 1 | **blue off**, red on |
+| 6 | Hardkernel v173.01.00.02 | `C4F2=28`, `C4F3=81` | ✅ | ❌ 0 | blue blinks, red on |
 
 Conclusions:
 - **UAS on ADATA's code works**: just set bit 6 of `0xC4E7`.
@@ -127,9 +144,11 @@ Conclusions:
   reports UNMAP as *not implemented*. Hardkernel's changelog says TRIM was
   added in their code: v173.01.00.01 "SAT and fstrim support", v173.01.00.02
   "Fix TRIM command".
-- **In Hardkernel's code, TRIM is enabled by `0xC41C` and/or `0xC4F3`.** Which
-  of the two, or which bit, is not yet isolated.
-- **The red LED comes from Hardkernel's code**, not from these NVRAM bytes.
+- **In Hardkernel's code, TRIM is enabled by bit 6 of `0xC4F3`.** `0xC41C` does
+  not matter (#5), and bit 7 alone is not enough (#6).
+- **The red LED comes from Hardkernel's code.** None of the NVRAM bits tried
+  (`C4F2` bits 4–5, `C4F3`, `C41C`) turns it off. `C4F2` bit 5 only inverts the
+  blue activity LED.
 
 ## How to
 
@@ -141,6 +160,7 @@ Conclusions:
 | Flashing: Hardkernel `JMS578FwUpdate` (v2.00 / v1.00) | **Linux on ARM**: 32-bit ARM static binary. Runs on Raspberry Pi, ODROID, other ARM SBCs, and on arm64 with 32-bit support | ✅ tested (arm64 SBC) |
 | Flashing: JMicron `FwUpdateTool` (`FwUpdateTool_v1_19_16_24.exe`) | **Windows**: the chip vendor's own GUI tool, same functions (backup, flash `.bin`) | ⚠️ not tested by us |
 | Flashing: `JMS578FwUpdate` via `qemu-user-static` (`qemu-arm`) | **Linux on x86-64** | ⚠️ not tested. The binary is static, so it should start; whether SG_IO passthrough works under emulation is unknown |
+| Flashing: [BertoldVdb/jms578flash](https://github.com/BertoldVdb/jms578flash) (open source) | **any Linux**, incl. x86-64 | ⚠️ not tested by us. Reported working on a JMS579 (tomman's thread). By default it injects its own SPI code into the image, so a readback won't match the file; verify the NVRAM region only, or use `-hook=false` |
 | TRIM afterwards (`fstrim`, udev rule) | Linux | ✅ tested |
 | TRIM afterwards | Windows / macOS | ⚠️ not tested. Windows 10/11 should issue TRIM to UAS devices that report UNMAP; check with `fsutil behavior query DisableDeleteNotify` and the drive optimizer |
 
@@ -232,20 +252,35 @@ python3 jms578_nvram.py patch adata-original.bin --uas on -o adata-uas.bin
 For an SMR disk this is pointless, because the write collapse is caused by the
 missing TRIM, not by the USB protocol.
 
+### If UAS misbehaves
+
+On some JMS578 boards UAS is unstable in hardware (stalls, data corruption,
+growing `UDMA_CRC_Error_Count` in SMART), and no firmware fixes it (see
+tomman's thread). Ours has been stable, but watch SMART attribute 199 and
+`dmesg` for resets. If it happens, turn UAS off and keep TRIM, either
+- in the NVRAM: `python3 jms578_nvram.py patch hd710pro-hk173.bin --uas off -o hd710pro-hk173-bot.bin`, then flash it; or
+- on the host: boot with `usb-storage.quirks=152d:0578:u`.
+
+TRIM also works over plain USB Mass Storage with the HK firmware. The udev rule
+is still needed.
+
+SMART: use `smartctl -d sat`. smartmontools picks the bridge type by VID:PID, and
+`152d:0578` is in its database.
+
 ## Open problems — help wanted
 
 1. **Shock sensor and red LED with Hardkernel's code.** Find which GPIO drives
    the red LED and which GPIO the sensor uses, and make the HK code leave the
-   LED off or implement the pause on shock. It needs disassembly of the 8051
-   code. ADATA's and HK's code come from the same JMicron SDK (~86% similar),
-   but the functions sit at different addresses.
+   LED off or implement the pause on shock. The NVRAM bits are exhausted (see
+   the experiments), so it needs disassembly of the 8051 code. ADATA's and HK's
+   code come from the same JMicron SDK (~86% similar), but the functions sit at
+   different addresses.
 2. **TRIM in ADATA's code.** Port the UNMAP → ATA DATA SET MANAGEMENT translation
    from HK v173.01.00.02 into ADATA v119.2.0.3. Remember to recompute the code
    checksum at `0x3FC`.
-3. **Which bit enables TRIM**: `0xC41C` (00/03) or `0xC4F3` (05/c1). Test one at
-   a time on the HK code.
-4. The meaning of the other NVRAM bytes, and of the ADATA-only low bits `5` in
-   `0xC4F3`.
+3. The remaining unknown bits: `0xC4E7` bits 2/0, `0xC4F2` bits 6/4,
+   `0xC4F3` bit 0 and the ADATA-only bit 2.
+4. Does the Windows flasher, qemu-user or `jms578flash` work for this enclosure?
 
 PRs and issue reports with your own experiments (always state the code version,
 the NVRAM diff, and `LBPU`/`lsusb -t`/LED results) are welcome.
@@ -255,8 +290,11 @@ the NVRAM diff, and `LBPU`/`lsusb -t`/LED results) are welcome.
 - Hardkernel, for the JMS578 firmware with TRIM and the flashing tool:
   [ODROID wiki](https://wiki.odroid.com/odroid-xu4/software/jms578_fw_update),
   [forum t=28241](https://forum.odroid.com/viewtopic.php?t=28241)
+- tomman (dilworks) and nkma, for the most complete NVRAM layout notes:
+  [bboard thread](https://helmet.kafuka.org/bboard/thread.php?id=259),
+  [Zibri/JMS579#3](https://github.com/Zibri/JMS579/issues/3)
 - Zibri, for the [JMS577/578/579 customizer](https://zibri.github.io/JMS579/index2.html)
-  with the meaning of the NVRAM bits
+- BertoldVdb, for the open-source [jms578flash](https://github.com/BertoldVdb/jms578flash)
 - BetterFirmware and others, [forum t=41926](https://forum.odroid.com/viewtopic.php?t=41926)
 - Firmware collections: [usbdev.ru](https://www.usbdev.ru/files/jmicron/jms578firmware/),
   [hferreira23/JMS578](https://github.com/hferreira23/JMS578)
