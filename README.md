@@ -79,9 +79,10 @@ same family is used in JMS576/577/578/579 bridges.
 - The **NVRAM has no checksum**. Checked on 34 different JMS578 images: two
   images from the same vendor differ in a single serial-number character and
   both work.
-- The second half of the NVRAM (`0xC500–C5FF`) is identical in every dump known
-  (md5 `34a237c125b376b075debfaa6fbff386`, also on our ADATA and Hardkernel
-  images). It is a handy check that you located the block correctly.
+- The second half of the NVRAM (`0xC500–C5FF`) is the same in almost every
+  dump (md5 `34a237c125b376b075debfaa6fbff386`, also on our ADATA and Hardkernel
+  images; 3 of 33 images in our collection differ in 237 of its bytes). It is a
+  handy check that you located the block correctly.
 - The **code area has a checksum at `0x3FC–0x3FF`**. The bridge also sets a flag
   at **`0x207` (00→01)** after its first boot and rewrites that checksum. So a
   dump read back from a used bridge differs from the release file in exactly
@@ -110,15 +111,15 @@ Offsets are absolute (relative offset + `0xC400`). Sources: **tomman** =
 | `0xC454` | USB serial descriptor, same format, up to 16 chars at `0xC456`. `0x00` = report the drive's own serial (sometimes a made-up one) | tomman, Zibri |
 | `0xC4C8` | SCSI INQUIRY vendor (8 bytes, space-padded) | tomman, obs |
 | `0xC4D0` | SCSI INQUIRY product (16 bytes, space-padded) | tomman, obs |
-| `0xC4E0–C4E1` | `"HD"` | tomman |
+| `0xC4E0–C4E1` | `"HD"`: a constant marker, present in all 33 images in our collection; purpose unknown | tomman, obs |
 | `0xC4E7` | features 1: **bit7 = USB Mass Storage (BOT)**, **bit6 = UAS**, **bit5 = 4K sector emulation** (keep off), bit1 usually set. HK `c3`, ADATA `83` (BOT only). Zibri's page has the labels of bits 7 and 5 swapped | tomman/nkma; bit6 obs |
-| `0xC4F0–C4F1` | `"BC"` | tomman |
+| `0xC4F0–C4F1` | `"BC"`: a constant marker, present in all 33 images; purpose unknown | tomman, obs |
 | `0xC4F2` | features 2: bit3 = power save (spin-down), **bit5 = activity-LED polarity**. HK and ADATA `38`. On the HD710 Pro, clearing bit5 (`18`) turns the **blue** LED off; the red LED is unaffected. Clearing bit4 (`28`) changed nothing visible | tomman/nkma, obs |
 | `0xC4F3` | features 3: **bit6 = TRIM (UNMAP) in the HK code**. Bit7 is set in every known dump; bit3 is set in an ODD-enabled firmware. HK `c1`, ADATA `05` (bits 7–6 clear, ADATA-only bit2 set) | tomman, **obs (exp. #4, #6)** |
 | `0xC4F6–C4F7` | spin-down timeout, seconds, big endian. `0` = never. HK 600, ADATA 180 | tomman, Zibri, obs |
-| `0xC4F8–C4FD` | `40 0F 32 05 00 00` | tomman |
-| `0xC4FE–C4FF` | `"JM"`, NVRAM identifier | tomman |
-| `0xC500–C5FF` | constant block, same in all dumps | tomman, obs |
+| `0xC4F8–C4FD` | `40 0F 32 05 00 00`. **`0xC4F8` is a setting**: `40` in 21 images (HK, ADATA), `00` in 12 (several generic and write-protect firmwares); its meaning is unknown. `0F 32 05 00 00` is the same everywhere | tomman, obs |
+| `0xC4FE–C4FF` | `"JM"`, NVRAM signature, in all 33 images. Probably how the code decides the NVRAM is valid: with an erased NVRAM the bridge falls back to built-in defaults (see the blank-NVRAM alternative). This is our guess, not tested | tomman, obs |
+| `0xC500–C5FF` | 256-byte block, the same in 30 of 33 images (3 differ in 237 bytes); purpose unknown, leave as is | tomman, obs |
 
 `python3 jms578_nvram.py info image.bin` decodes all of these.
 
