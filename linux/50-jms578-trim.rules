@@ -1,0 +1,5 @@
+# JMS578 bridge (e.g. ADATA HD710 Pro reflashed with Hardkernel v173): the bridge reports UNMAP (LBPU=1),
+# but the kernel sets provisioning_mode=disabled. A rule on SUBSYSTEM=="scsi_disk" fires before the kernel
+# sets the mode and gets overwritten, so the mode is written when the block device appears.
+# Мост JMS578 сообщает о поддержке UNMAP, но ядро ставит provisioning_mode=disabled; пишем unmap при появлении диска.
+ACTION=="add|change", SUBSYSTEM=="block", ENV{DEVTYPE}=="disk", KERNEL=="sd[a-z]", ATTRS{idVendor}=="152d", ATTRS{idProduct}=="0578", ATTR{queue/read_ahead_kb}="4096", RUN+="/bin/sh -c 'for f in /sys/block/%k/device/scsi_disk/*/provisioning_mode; do echo unmap > $$f; done'"
